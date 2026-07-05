@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1b1f26">
+<title>Badgeuse</title>
+<style>
+  :root {
+    --bg: #1b1f26;          /* charbon bleuté, façon boîtier de pointeuse */
+    --panel: #232833;
+    --panel-edge: #2e3542;
+    --ink: #e8e6df;         /* blanc cassé */
+    --ink-dim: #8a9099;
+    --led: #ffb347;         /* ambre LED */
+    --led-dim: #6b4d23;
+    --go: #4fc26b;          /* vert entrée */
+    --stop: #e2574c;        /* rouge sortie */
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", "Cascadia Mono", Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 16px 40px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-dim);
+  }
+  #clock {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ink-dim);
+  }
+
+  /* ---- Afficheur LED ---- */
+  .display {
+    width: 100%;
+    background: #12151b;
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    padding: 18px 16px 14px;
+    text-align: center;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,.55);
+    margin-bottom: 22px;
+  }
+  .display .label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 6px;
+  }
+  .display .value {
+    font-family: var(--mono);
+    font-size: 44px;
+    font-weight: 500;
+    color: var(--led);
+    text-shadow: 0 0 14px rgba(255,179,71,.35);
+    font-variant-numeric: tabular-nums;
+  }
+  .display.idle .value { color: var(--led-dim); text-shadow: none; }
+  .display .since {
+    font-size: 12px;
+    color: var(--ink-dim);
+    margin-top: 6px;
+    min-height: 15px;
+  }
+
+  /* ---- Bouton badge ---- */
+  #punch {
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #10130a;
+    background: radial-gradient(circle at 35% 30%, #6fdc8b, var(--go) 60%, #35914d);
+    box-shadow: 0 6px 0 #2c7440, 0 10px 24px rgba(0,0,0,.5);
+    transition: transform .06s ease, box-shadow .06s ease;
+    margin-bottom: 26px;
+    user-select: none;
+  }
+  #punch:active { transform: translateY(5px); box-shadow: 0 1px 0 #2c7440, 0 4px 12px rgba(0,0,0,.5); }
+  #punch.working {
+    color: #1c0b09;
+    background: radial-gradient(circle at 35% 30%, #f08078, var(--stop) 60%, #a83a32);
+    box-shadow: 0 6px 0 #7e2b25, 0 10px 24px rgba(0,0,0,.5);
+  }
+  #punch.working:active { box-shadow: 0 1px 0 #7e2b25, 0 4px 12px rgba(0,0,0,.5); }
+  #punch small { display: block; font-size: 11px; font-weight: 500; letter-spacing: 2px; margin-top: 4px; opacity: .75; }
+
+  /* ---- Compteurs ---- */
+  .totals {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .totals .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .totals .card .t-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 4px;
+  }
+  .totals .card .t-value {
+    font-family: var(--mono);
+    font-size: 16px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Historique ---- */
+  section.history { width: 100%; }
+  section.history h2 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+  }
+  .day {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .day-head {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .day-head .day-total { font-family: var(--mono); color: var(--ink); }
+  .session {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .session:last-child { border-bottom: none; }
+  .session .times input {
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 14px;
+    width: 62px;
+    padding: 2px 0;
+    border-bottom: 1px dashed transparent;
+  }
+  .session .times input:focus {
+    outline: none;
+    border-bottom-color: var(--led);
+    color: var(--led);
+  }
+  .session .dur { color: var(--ink-dim); font-size: 13px; }
+  .session .del {
+    background: none;
+    border: none;
+    color: var(--ink-dim);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+  .session.open .dur { color: var(--go); }
+
+  .empty {
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 13px;
+    padding: 24px 0;
+  }
+
+  footer {
+    width: 100%;
+    margin-top: 22px;
+    display: flex;
+    gap: 8px;
+  }
+  footer button {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    color: var(--ink-dim);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  footer button:active { background: var(--panel-edge); }
+
+  @media (prefers-reduced-motion: reduce) {
+    #punch { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Badgeuse</h1>
+  <span id="clock">--:--</span>
+</header>
+
+<div class="display idle" id="display">
+  <div class="label" id="dispLabel">Aujourd'hui</div>
+  <div class="value" id="dispValue">0 h 00</div>
+  <div class="since" id="dispSince"></div>
+</div>
+
+<button id="punch">Pointer<small>Entrée</small></button>
+
+<div class="totals">
+  <div class="card"><div class="t-label">Jour</div><div class="t-value" id="totDay">0 h 00</div></div>
+  <div class="card"><div class="t-label">Semaine</div><div class="t-value" id="totWeek">0 h 00</div></div>
+  <div class="card"><div class="t-label">Mois</div><div class="t-value" id="totMonth">0 h 00</div></div>
+</div>
+
+<section class="history">
+  <h2>Historique</h2>
+  <div id="days"></div>
+</section>
+
+<footer>
+  <button id="exportBtn">Exporter CSV</button>
+  <button id="wipeBtn">Tout effacer</button>
+</footer>
+
+<script>
+(function () {
+  var KEY = 'badgeuse_sessions_v1';
+
+  // ---- Données ----
+  // sessions : tableau de { in: ms, out: ms|null }, trié par date d'entrée
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function save(sessions) {
+    localStorage.setItem(KEY, JSON.stringify(sessions));
+  }
+  var sessions = load();
+
+  function current() {
+    var last = sessions[sessions.length - 1];
+    return (last && last.out === null) ? last : null;
+  }
+
+  // ---- Utilitaires temps ----
+  function fmtDur(ms) {
+    if (ms < 0) ms = 0;
+    var totalMin = Math.floor(ms / 60000);
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    return h + ' h ' + (m < 10 ? '0' : '') + m;
+  }
+  function fmtHM(ts) {
+    var d = new Date(ts);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function dayKey(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function startOfDay(d) { var x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); }
+  function startOfWeek(d) { // lundi
+    var x = new Date(d); x.setHours(0,0,0,0);
+    var wd = (x.getDay() + 6) % 7; // lundi = 0
+    x.setDate(x.getDate() - wd);
+    return x.getTime();
+  }
+  function startOfMonth(d) { var x = new Date(d); x.setHours(0,0,0,0); x.setDate(1); return x.getTime(); }
+
+  function durOf(s, now) {
+    return (s.out === null ? now : s.out) - s.in;
+  }
+  function totalSince(threshold, now) {
+    var t = 0;
+    for (var i = 0; i < sessions.length; i++) {
+      if (sessions[i].in >= threshold) t += durOf(sessions[i], now);
+    }
+    return t;
+  }
+
+  // ---- Rendu ----
+  var display = document.getElementById('display');
+  var dispLabel = document.getElementById('dispLabel');
+  var dispValue = document.getElementById('dispValue');
+  var dispSince = document.getElementById('dispSince');
+  var punchBtn = document.getElementById('punch');
+  var totDay = document.getElementById('totDay');
+  var totWeek = document.getElementById('totWeek');
+  var totMonth = document.getElementById('totMonth');
+  var daysEl = document.getElementById('days');
+  var clockEl = document.getElementById('clock');
+
+  var DAYS_FR = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var MONTHS_FR = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  function fmtDayLabel(key) {
+    var p = key.split('-');
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    var today = dayKey(Date.now());
+    if (key === today) return "Aujourd'hui";
+    return DAYS_FR[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS_FR[d.getMonth()];
+  }
+
+  function tick() {
+    var now = Date.now();
+    clockEl.textContent = fmtHM(now);
+
+    var cur = current();
+    if (cur) {
+      display.classList.remove('idle');
+      dispLabel.textContent = 'Session en cours';
+      dispValue.textContent = fmtDur(now - cur.in);
+      dispSince.textContent = 'Pointé à ' + fmtHM(cur.in);
+      punchBtn.classList.add('working');
+      punchBtn.innerHTML = 'Dépointer<small>Sortie</small>';
+    } else {
+      display.classList.add('idle');
+      dispLabel.textContent = "Aujourd'hui";
+      dispValue.textContent = fmtDur(totalSince(startOfDay(now), now));
+      dispSince.textContent = '';
+      punchBtn.classList.remove('working');
+      punchBtn.innerHTML = 'Pointer<small>Entrée</small>';
+    }
+
+    totDay.textContent = fmtDur(totalSince(startOfDay(now), now));
+    totWeek.textContent = fmtDur(totalSince(startOfWeek(now), now));
+    totMonth.textContent = fmtDur(totalSince(startOfMonth(now), now));
+  }
+
+  function renderHistory() {
+    var now = Date.now();
+    daysEl.innerHTML = '';
+    if (sessions.length === 0) {
+      daysEl.innerHTML = '<div class="empty">Aucun pointage pour l\'instant.<br>Appuie sur le bouton en arrivant au travail.</div>';
+      return;
+    }
+    // Regrouper par jour (jour de l'entrée), du plus récent au plus ancien
+    var groups = {};
+    var order = [];
+    for (var i = sessions.length - 1; i >= 0; i--) {
+      var k = dayKey(sessions[i].in);
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(i); // index dans sessions
+    }
+    order.slice(0, 30).forEach(function (k) {
+      var dayDiv = document.createElement('div');
+      dayDiv.className = 'day';
+      var total = 0;
+      groups[k].forEach(function (idx) { total += durOf(sessions[idx], now); });
+
+      var head = document.createElement('div');
+      head.className = 'day-head';
+      head.innerHTML = '<span>' + fmtDayLabel(k) + '</span><span class="day-total">' + fmtDur(total) + '</span>';
+      dayDiv.appendChild(head);
+
+      groups[k].forEach(function (idx) {
+        var s = sessions[idx];
+        var row = document.createElement('div');
+        row.className = 'session' + (s.out === null ? ' open' : '');
+
+        var times = document.createElement('span');
+        times.className = 'times';
+        var inInput = makeTimeInput(idx, 'in');
+        times.appendChild(inInput);
+        times.appendChild(document.createTextNode(' → '));
+        if (s.out === null) {
+          var openSpan = document.createElement('span');
+          openSpan.textContent = '…';
+          times.appendChild(openSpan);
+        } else {
+          times.appendChild(makeTimeInput(idx, 'out'));
+        }
+        row.appendChild(times);
+
+        var dur = document.createElement('span');
+        dur.className = 'dur';
+        dur.textContent = s.out === null ? 'en cours' : fmtDur(durOf(s, now));
+        row.appendChild(dur);
+
+        var del = document.createElement('button');
+        del.className = 'del';
+        del.setAttribute('aria-label', 'Supprimer cette session');
+        del.textContent = '✕';
+        del.onclick = function () {
+          if (confirm('Supprimer cette session ?')) {
+            sessions.splice(idx, 1);
+            save(sessions);
+            refresh();
+          }
+        };
+        row.appendChild(del);
+
+        dayDiv.appendChild(row);
+      });
+      daysEl.appendChild(dayDiv);
+    });
+  }
+
+  // Champ heure éditable (corriger un oubli de pointage)
+  function makeTimeInput(idx, field) {
+    var input = document.createElement('input');
+    input.type = 'time';
+    var s = sessions[idx];
+    var d = new Date(s[field]);
+    input.value = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    input.onchange = function () {
+      var parts = input.value.split(':');
+      if (parts.length !== 2) return;
+      var nd = new Date(s[field]);
+      nd.setHours(+parts[0], +parts[1], 0, 0);
+      s[field] = nd.getTime();
+      // garde-fou : sortie avant entrée
+      if (s.out !== null && s.out < s.in) {
+        var tmp = s.in; s.in = s.out; s.out = tmp;
+      }
+      save(sessions);
+      refresh();
+    };
+    return input;
+  }
+
+  function refresh() {
+    tick();
+    renderHistory();
+  }
+
+  // ---- Actions ----
+  punchBtn.onclick = function () {
+    var now = Date.now();
+    var cur = current();
+    if (cur) {
+      cur.out = now;
+    } else {
+      sessions.push({ in: now, out: null });
+    }
+    save(sessions);
+    if (navigator.vibrate) navigator.vibrate(40);
+    refresh();
+  };
+
+  document.getElementById('exportBtn').onclick = function () {
+    var lines = ['date;entree;sortie;duree_minutes'];
+    sessions.forEach(function (s) {
+      var out = s.out === null ? '' : fmtHM(s.out);
+      var dur = s.out === null ? '' : Math.round((s.out - s.in) / 60000);
+      lines.push(dayKey(s.in) + ';' + fmtHM(s.in) + ';' + out + ';' + dur);
+    });
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'badgeuse_' + dayKey(Date.now()) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  };
+
+  document.getElementById('wipeBtn').onclick = function () {
+    if (confirm('Effacer TOUT l\'historique ? (pense à exporter en CSV avant)')) {
+      sessions = [];
+      save(sessions);
+      refresh();
+    }
+  };
+
+  // ---- Boucle ----
+  refresh();
+  setInterval(tick, 1000);
+  // re-rendre l'historique chaque minute (durée de la session en cours)
+  setInterval(renderHistory, 60000);
+})();
+</script>
+</body>
+</html>
