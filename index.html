@@ -142,6 +142,76 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* ---- Calendrier ---- */
+  .cal {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 24px;
+  }
+  .cal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .cal-head .cal-title {
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .cal-head button {
+    background: none;
+    border: 1px solid var(--panel-edge);
+    color: var(--ink-dim);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .cal-head button:active { background: var(--panel-edge); }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-dow {
+    text-align: center;
+    font-size: 10px;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    padding: 2px 0;
+  }
+  .cal-cell {
+    min-height: 42px;
+    border-radius: 6px;
+    background: #1d222b;
+    padding: 4px 1px;
+    text-align: center;
+  }
+  .cal-cell.off { background: transparent; }
+  .cal-cell.worked { background: #262e3b; border: 1px solid #354052; }
+  .cal-cell .d { font-size: 11px; color: var(--ink-dim); }
+  .cal-cell.today .d { color: var(--led); font-weight: 700; }
+  .cal-cell .h {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--led);
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cal-foot {
+    margin-top: 10px;
+    text-align: right;
+    font-size: 11px;
+    color: var(--ink-dim);
+  }
+  .cal-foot span { font-family: var(--mono); color: var(--ink); }
+
   /* ---- Historique ---- */
   section.history { width: 100%; }
   section.history h2 {
@@ -256,6 +326,16 @@
   <div class="card"><div class="t-label">Mois</div><div class="t-value" id="totMonth">0 h 00</div></div>
 </div>
 
+<div class="cal">
+  <div class="cal-head">
+    <button id="calPrev" aria-label="Mois précédent">‹</button>
+    <span class="cal-title" id="calTitle"></span>
+    <button id="calNext" aria-label="Mois suivant">›</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-foot">Total du mois affiché : <span id="calTotal">0 h 00</span></div>
+</div>
+
 <section class="history">
   <h2>Historique</h2>
   <div id="days"></div>
@@ -263,8 +343,10 @@
 
 <footer>
   <button id="exportBtn">Exporter CSV</button>
+  <button id="importBtn">Importer CSV</button>
   <button id="wipeBtn">Tout effacer</button>
 </footer>
+<input type="file" id="importFile" accept=".csv,text/csv" style="display:none">
 
 <script>
 (function () {
@@ -462,9 +544,83 @@
     return input;
   }
 
+  // ---- Calendrier ----
+  var calTitle = document.getElementById('calTitle');
+  var calGrid = document.getElementById('calGrid');
+  var calTotal = document.getElementById('calTotal');
+  var MONTHS_FULL = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var DOW = ['L','M','M','J','V','S','D'];
+  var calNow = new Date();
+  var calView = { y: calNow.getFullYear(), m: calNow.getMonth() };
+
+  function fmtShort(ms) {
+    var totalMin = Math.round(ms / 60000);
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    if (h === 0) return m + 'm';
+    return h + 'h' + (m < 10 ? '0' : '') + m;
+  }
+
+  function renderCalendar() {
+    var now = Date.now();
+    // totaux par jour (jour de l'entrée)
+    var perDay = {};
+    sessions.forEach(function (s) {
+      var k = dayKey(s.in);
+      perDay[k] = (perDay[k] || 0) + durOf(s, now);
+    });
+
+    calTitle.textContent = MONTHS_FULL[calView.m] + ' ' + calView.y;
+    calGrid.innerHTML = '';
+    DOW.forEach(function (d) {
+      var el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = d;
+      calGrid.appendChild(el);
+    });
+
+    var firstOffset = (new Date(calView.y, calView.m, 1).getDay() + 6) % 7; // lundi = 0
+    var daysInMonth = new Date(calView.y, calView.m + 1, 0).getDate();
+    var todayK = dayKey(now);
+    var monthTotal = 0;
+
+    for (var i = 0; i < firstOffset; i++) {
+      var pad = document.createElement('div');
+      pad.className = 'cal-cell off';
+      calGrid.appendChild(pad);
+    }
+    for (var day = 1; day <= daysInMonth; day++) {
+      var k = calView.y + '-' + String(calView.m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      if (k === todayK) cell.classList.add('today');
+      var html = '<div class="d">' + day + '</div>';
+      if (perDay[k]) {
+        cell.classList.add('worked');
+        html += '<div class="h">' + fmtShort(perDay[k]) + '</div>';
+        monthTotal += perDay[k];
+      }
+      cell.innerHTML = html;
+      calGrid.appendChild(cell);
+    }
+    calTotal.textContent = fmtDur(monthTotal);
+  }
+
+  document.getElementById('calPrev').onclick = function () {
+    calView.m--;
+    if (calView.m < 0) { calView.m = 11; calView.y--; }
+    renderCalendar();
+  };
+  document.getElementById('calNext').onclick = function () {
+    calView.m++;
+    if (calView.m > 11) { calView.m = 0; calView.y++; }
+    renderCalendar();
+  };
+
   function refresh() {
     tick();
     renderHistory();
+    renderCalendar();
   }
 
   // ---- Actions ----
@@ -498,6 +654,50 @@
     URL.revokeObjectURL(a.href);
   };
 
+  // ---- Import CSV (restauration de sauvegarde) ----
+  var importFile = document.getElementById('importFile');
+  document.getElementById('importBtn').onclick = function () { importFile.click(); };
+  importFile.onchange = function () {
+    var file = importFile.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var lines = String(reader.result).split(/\r?\n/);
+      var added = 0, skipped = 0;
+      // index des entrées existantes pour éviter les doublons
+      var existing = {};
+      sessions.forEach(function (s) { existing[s.in] = true; });
+      lines.forEach(function (line) {
+        line = line.trim();
+        if (!line || line.indexOf('date;') === 0) return; // en-tête ou ligne vide
+        var cols = line.split(';');
+        if (cols.length < 3) return;
+        var dp = cols[0].split('-'); // AAAA-MM-JJ
+        var tin = cols[1].split(':'); // HH:MM
+        if (dp.length !== 3 || tin.length !== 2) return;
+        var inMs = new Date(+dp[0], +dp[1] - 1, +dp[2], +tin[0], +tin[1]).getTime();
+        var outMs = null;
+        if (cols[2]) {
+          var tout = cols[2].split(':');
+          if (tout.length === 2) {
+            outMs = new Date(+dp[0], +dp[1] - 1, +dp[2], +tout[0], +tout[1]).getTime();
+            if (outMs < inMs) outMs += 24 * 3600 * 1000; // sortie après minuit
+          }
+        }
+        if (existing[inMs]) { skipped++; return; }
+        existing[inMs] = true;
+        sessions.push({ in: inMs, out: outMs });
+        added++;
+      });
+      sessions.sort(function (a, b) { return a.in - b.in; });
+      save(sessions);
+      refresh();
+      alert(added + ' session(s) importée(s)' + (skipped ? ', ' + skipped + ' doublon(s) ignoré(s)' : '') + '.');
+      importFile.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   document.getElementById('wipeBtn').onclick = function () {
     if (confirm('Effacer TOUT l\'historique ? (pense à exporter en CSV avant)')) {
       sessions = [];
@@ -509,8 +709,8 @@
   // ---- Boucle ----
   refresh();
   setInterval(tick, 1000);
-  // re-rendre l'historique chaque minute (durée de la session en cours)
-  setInterval(renderHistory, 60000);
+  // re-rendre l'historique et le calendrier chaque minute (durée de la session en cours)
+  setInterval(function () { renderHistory(); renderCalendar(); }, 60000);
 })();
 </script>
 </body>
