@@ -247,31 +247,113 @@
     border-bottom: 1px solid rgba(255,255,255,.04);
   }
   .session:last-child { border-bottom: none; }
-  .session .times input {
-    background: transparent;
-    border: none;
-    color: var(--ink);
-    font-family: var(--mono);
-    font-size: 14px;
-    width: 62px;
-    padding: 2px 0;
-    border-bottom: 1px dashed transparent;
-  }
-  .session .times input:focus {
-    outline: none;
-    border-bottom-color: var(--led);
-    color: var(--led);
-  }
+  .session:active { background: rgba(255,255,255,.05); }
+  .session .times { color: var(--ink); }
   .session .dur { color: var(--ink-dim); font-size: 13px; }
-  .session .del {
-    background: none;
-    border: none;
+  .session .edit {
     color: var(--ink-dim);
-    font-size: 16px;
-    cursor: pointer;
-    padding: 4px 6px;
+    font-size: 15px;
+    padding: 2px 4px;
   }
   .session.open .dur { color: var(--go); }
+
+  .hist-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  #addBtn {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    color: var(--led);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  #addBtn:active { background: var(--panel-edge); }
+
+  /* ---- Modal d'édition ---- */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 12px;
+    padding: 18px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .modal h3 {
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 5px;
+  }
+  .field input {
+    width: 100%;
+    background: #12151b;
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 17px;
+    padding: 10px;
+  }
+  .field input:focus { outline: none; border-color: var(--led); }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+  #modalDur {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--led);
+    text-align: center;
+    margin-bottom: 14px;
+    min-height: 18px;
+  }
+  #modalDur.err { color: var(--stop); }
+  .modal-actions { display: flex; gap: 8px; }
+  .modal-actions button {
+    flex: 1;
+    border-radius: 8px;
+    padding: 11px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid var(--panel-edge);
+    background: transparent;
+    color: var(--ink-dim);
+  }
+  .modal-actions button.primary {
+    background: var(--go);
+    border-color: var(--go);
+    color: #10130a;
+    font-weight: 700;
+  }
+  .modal-actions button.danger { color: var(--stop); border-color: #5a2a26; }
+  #modalDelete { flex: 0 0 46px; font-size: 16px; }
 
   .empty {
     text-align: center;
@@ -337,7 +419,10 @@
 </div>
 
 <section class="history">
-  <h2>Historique</h2>
+  <div class="hist-head">
+    <h2>Historique</h2>
+    <button id="addBtn">+ Ajouter</button>
+  </div>
   <div id="days"></div>
 </section>
 
@@ -347,6 +432,32 @@
   <button id="wipeBtn">Tout effacer</button>
 </footer>
 <input type="file" id="importFile" accept=".csv,text/csv" style="display:none">
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Modifier la session</h3>
+    <div class="field">
+      <label for="fDate">Date</label>
+      <input type="date" id="fDate">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fIn">Entrée</label>
+        <input type="time" id="fIn">
+      </div>
+      <div class="field">
+        <label for="fOut">Sortie</label>
+        <input type="time" id="fOut">
+      </div>
+    </div>
+    <div id="modalDur"></div>
+    <div class="modal-actions">
+      <button id="modalCancel">Annuler</button>
+      <button id="modalDelete" class="danger" aria-label="Supprimer">✕</button>
+      <button id="modalSave" class="primary">Enregistrer</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -485,16 +596,7 @@
 
         var times = document.createElement('span');
         times.className = 'times';
-        var inInput = makeTimeInput(idx, 'in');
-        times.appendChild(inInput);
-        times.appendChild(document.createTextNode(' → '));
-        if (s.out === null) {
-          var openSpan = document.createElement('span');
-          openSpan.textContent = '…';
-          times.appendChild(openSpan);
-        } else {
-          times.appendChild(makeTimeInput(idx, 'out'));
-        }
+        times.textContent = fmtHM(s.in) + ' → ' + (s.out === null ? '…' : fmtHM(s.out));
         row.appendChild(times);
 
         var dur = document.createElement('span');
@@ -502,18 +604,12 @@
         dur.textContent = s.out === null ? 'en cours' : fmtDur(durOf(s, now));
         row.appendChild(dur);
 
-        var del = document.createElement('button');
-        del.className = 'del';
-        del.setAttribute('aria-label', 'Supprimer cette session');
-        del.textContent = '✕';
-        del.onclick = function () {
-          if (confirm('Supprimer cette session ?')) {
-            sessions.splice(idx, 1);
-            save(sessions);
-            refresh();
-          }
-        };
-        row.appendChild(del);
+        var pen = document.createElement('span');
+        pen.className = 'edit';
+        pen.textContent = '✎';
+        row.appendChild(pen);
+
+        row.onclick = function () { openEditor(idx); };
 
         dayDiv.appendChild(row);
       });
@@ -521,28 +617,96 @@
     });
   }
 
-  // Champ heure éditable (corriger un oubli de pointage)
-  function makeTimeInput(idx, field) {
-    var input = document.createElement('input');
-    input.type = 'time';
-    var s = sessions[idx];
-    var d = new Date(s[field]);
-    input.value = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    input.onchange = function () {
-      var parts = input.value.split(':');
-      if (parts.length !== 2) return;
-      var nd = new Date(s[field]);
-      nd.setHours(+parts[0], +parts[1], 0, 0);
-      s[field] = nd.getTime();
-      // garde-fou : sortie avant entrée
-      if (s.out !== null && s.out < s.in) {
-        var tmp = s.in; s.in = s.out; s.out = tmp;
-      }
-      save(sessions);
-      refresh();
-    };
-    return input;
+  // ---- Éditeur (modal) ----
+  var modalBg = document.getElementById('modalBg');
+  var modalTitle = document.getElementById('modalTitle');
+  var fDate = document.getElementById('fDate');
+  var fIn = document.getElementById('fIn');
+  var fOut = document.getElementById('fOut');
+  var modalDur = document.getElementById('modalDur');
+  var modalDelete = document.getElementById('modalDelete');
+  var editIdx = null; // null = création
+
+  function hm(ts) {
+    var d = new Date(ts);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
+  function buildTs(dateStr, timeStr) {
+    var dp = dateStr.split('-'), tp = timeStr.split(':');
+    if (dp.length !== 3 || tp.length !== 2) return null;
+    return new Date(+dp[0], +dp[1] - 1, +dp[2], +tp[0], +tp[1], 0, 0).getTime();
+  }
+
+  function updateModalDur() {
+    modalDur.classList.remove('err');
+    if (!fDate.value || !fIn.value) { modalDur.textContent = ''; return; }
+    if (!fOut.value) { modalDur.textContent = 'Session ouverte (pas encore de sortie)'; return; }
+    var a = buildTs(fDate.value, fIn.value), b = buildTs(fDate.value, fOut.value);
+    if (a === null || b === null) { modalDur.textContent = ''; return; }
+    if (b <= a) {
+      modalDur.textContent = 'La sortie doit être après l\'entrée';
+      modalDur.classList.add('err');
+      return;
+    }
+    modalDur.textContent = 'Durée : ' + fmtDur(b - a);
+  }
+  fDate.oninput = fIn.oninput = fOut.oninput = updateModalDur;
+
+  function openEditor(idx) {
+    editIdx = idx;
+    if (idx === null) {
+      modalTitle.textContent = 'Nouvelle session';
+      var d = new Date();
+      fDate.value = dayKey(d.getTime());
+      fIn.value = '09:00';
+      fOut.value = '17:00';
+      modalDelete.style.display = 'none';
+    } else {
+      modalTitle.textContent = 'Modifier la session';
+      var s = sessions[idx];
+      fDate.value = dayKey(s.in);
+      fIn.value = hm(s.in);
+      fOut.value = s.out === null ? '' : hm(s.out);
+      modalDelete.style.display = '';
+    }
+    updateModalDur();
+    modalBg.classList.add('show');
+  }
+  function closeEditor() {
+    modalBg.classList.remove('show');
+    editIdx = null;
+  }
+
+  document.getElementById('addBtn').onclick = function () { openEditor(null); };
+  document.getElementById('modalCancel').onclick = closeEditor;
+  modalBg.onclick = function (e) { if (e.target === modalBg) closeEditor(); };
+
+  modalDelete.onclick = function () {
+    if (editIdx === null) return;
+    if (confirm('Supprimer cette session ?')) {
+      sessions.splice(editIdx, 1);
+      save(sessions);
+      closeEditor();
+      refresh();
+    }
+  };
+
+  document.getElementById('modalSave').onclick = function () {
+    if (!fDate.value || !fIn.value) { alert('Renseigne au moins la date et l\'heure d\'entrée.'); return; }
+    var inMs = buildTs(fDate.value, fIn.value);
+    var outMs = fOut.value ? buildTs(fDate.value, fOut.value) : null;
+    if (outMs !== null && outMs <= inMs) { alert('L\'heure de sortie doit être après l\'heure d\'entrée.'); return; }
+    if (editIdx === null) {
+      sessions.push({ in: inMs, out: outMs });
+    } else {
+      sessions[editIdx].in = inMs;
+      sessions[editIdx].out = outMs;
+    }
+    sessions.sort(function (a, b) { return a.in - b.in; });
+    save(sessions);
+    closeEditor();
+    refresh();
+  };
 
   // ---- Calendrier ----
   var calTitle = document.getElementById('calTitle');
@@ -601,6 +765,18 @@
         monthTotal += perDay[k];
       }
       cell.innerHTML = html;
+      cell.style.cursor = 'pointer';
+      (function (key) {
+        cell.onclick = function () {
+          // s'il existe déjà une session ce jour-là, ouvrir la première ; sinon en créer une
+          for (var j = 0; j < sessions.length; j++) {
+            if (dayKey(sessions[j].in) === key) { openEditor(j); return; }
+          }
+          openEditor(null);
+          fDate.value = key;
+          updateModalDur();
+        };
+      })(k);
       calGrid.appendChild(cell);
     }
     calTotal.textContent = fmtDur(monthTotal);
